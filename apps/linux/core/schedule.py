@@ -1,4 +1,4 @@
-"""Scheduling — S04-1: daily + weekly_days (SPEC §2). Pure logic, no Qt."""
+"""Scheduling — S04-2: all 5 types (SPEC §2). Pure logic, no Qt."""
 
 from __future__ import annotations
 
@@ -47,7 +47,16 @@ def is_due(habit: Mapping[str, Any], on: DateLike) -> bool:
     if stype == "weekly_days":
         days = _schedule_json(habit).get("days", [])
         return d.isoweekday() in set(days)
-    raise ValueError(f"unsupported schedule_type (S04-1): {stype!r}")
+    if stype == "interval":
+        n = int(_schedule_json(habit).get("every_n_days", 1) or 1)
+        if n <= 0:
+            raise ValueError("every_n_days must be >= 1")
+        start = _to_date(_habit_get(habit, "start_date"))
+        return (d - start).days % n == 0
+    if stype in ("times_per_week", "times_per_month"):
+        # Flexible goal: every day counts as due (SPEC §2).
+        return True
+    raise ValueError(f"unsupported schedule_type: {stype!r}")
 
 
 def is_due_today(habit: Mapping[str, Any], today: DateLike | None = None) -> bool:
