@@ -1,0 +1,108 @@
+# ===== tmp / temp files (all) =====
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
+*.orig
+tmp/
+temp/
+.tmp/
+TMP/
+.cache/tmp/
+
+# ===== tests - do NOT commit app tests =====
+**/tests/
+**/test/
+tests/
+test/
+**/test_*.py
+**/*_test.py
+**/*_test.go
+**/*Test.kt
+**/*Test.java
+*Test.cs
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+
+# ===== Python + PySide6 / Qt =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+build/
+dist/
+.venv/
+venv/
+env/
+ENV/
+pip-wheel-metadata/
+*.so
+.pro.user
+*.autosave
+*.qmlc
+*.jsc
+
+# ===== SQLite local data =====
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+
+# ===== Linux packaging output =====
+*.AppImage
+*.deb
+*.rpm
+*.flatpak
+*.snap
+appimagetool-*
+squashfs-root/
+
+# ===== Android =====
+apps/android/local.properties
+apps/android/*.jks
+apps/android/*.keystore
+apps/android/.gradle/
+apps/android/build/
+apps/android/app/build/
+apps/android/app/release/
+
+# ===== Windows / C# =====
+[Bb]in/
+[Oo]bj/
+*.user
+*.suo
+.vs/
+apps/windows/bin/
+apps/windows/obj/
+
+# ===== OS / editors =====
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.code-workspace
+*.sublime-project
+*.sublime-workspace
+
+# ===== env / secrets / local =====
+.env
+.env.*
+*.log
+*.pem
+*.key
+local_settings.py
+
+# ===== session dumps / large artifacts =====
+new-session---*.json
+*.mp4
+*.mov
+*.mkv
