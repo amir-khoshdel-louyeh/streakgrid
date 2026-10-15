@@ -1,4 +1,4 @@
-"""Scheduling — S04-2: all 5 types (SPEC §2). Pure logic, no Qt."""
+"""Scheduling — S04-3: is_due + next_due (SPEC §2). Pure logic, no Qt."""
 
 from __future__ import annotations
 
@@ -63,3 +63,15 @@ def is_due_today(habit: Mapping[str, Any], today: DateLike | None = None) -> boo
     from datetime import date as _d
 
     return is_due(habit, today or _d.today())
+
+
+def next_due(habit: Mapping[str, Any], from_date: DateLike | None = None) -> date | None:
+    """Next due date on/after `from_date` (None if archived/never)."""
+    from datetime import timedelta, date as _d
+
+    start = _to_date(from_date or _d.today())
+    for i in range(0, 400):
+        cand = start + timedelta(days=i)
+        if is_due(habit, cand):
+            return cand
+    return None
