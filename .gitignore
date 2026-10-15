@@ -101,6 +101,11 @@ desktop.ini
 *.key
 local_settings.py
 
+# ===== docs - do NOT publish =====
+docs/
+**/docs/
+core/docs/
+
 # ===== session dumps / large artifacts =====
 new-session---*.json
 *.mp4
