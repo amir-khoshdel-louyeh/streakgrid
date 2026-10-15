@@ -1,8 +1,8 @@
-"""Streaks — S05-1: done predicate + pause helper (SPEC §3). Pure logic, no Qt."""
+"""Streaks — S05-2: current_streak walk (SPEC §3). Pure logic, no Qt."""
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from typing import Any, Mapping, Sequence, Union
 
 DateLike = Union[date, str]
@@ -55,3 +55,43 @@ def is_paused(pauses: Sequence[Any], on: DateLike) -> bool:
         if s <= d <= e:
             return True
     return False
+
+
+def current_streak(
+    habit: Mapping[str, Any],
+    completions: Mapping[str, int],
+    pauses: Sequence[Any] | None = None,
+    today: DateLike | None = None,
+) -> int:
+    """Backwards walk from today (SPEC §3). Unscheduled + paused are skipped."""
+    from .schedule import is_due
+
+    pauses = pauses or []
+    end = _to_date(today) if today is not None else date.today()
+    start_raw = _habit_get(habit, "start_date")
+    start = _to_date(start_raw) if start_raw else end - timedelta(days=365 * 3)
+    if int(_habit_get(habit, "archived", 0) or 0) == 1:
+        return 0
+
+    streak = 0
+    d = end
+    while d >= start:
+        iso = d.isoformat()
+        if not is_due(habit, d):
+            d -= timedelta(days=1)
+            continue
+        if is_paused(pauses, d):
+            d -= timedelta(days=1)
+            continue
+        has_row = iso in completions
+        done = is_done(habit, completions.get(iso), has_row)
+        if done:
+            streak += 1
+        else:
+            if d == end:
+                # Today not yet done -> streak still alive, look back.
+                d -= timedelta(days=1)
+                continue
+            break
+        d -= timedelta(days=1)
+    return streak
