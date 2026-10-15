@@ -1,4 +1,4 @@
-"""SQLite store — S03: habits + completions (SPEC §1)."""
+"""SQLite store — S03: full SPEC §1 schema (5 tables)."""
 
 from __future__ import annotations
 
@@ -47,6 +47,27 @@ CREATE INDEX IF NOT EXISTS idx_completions_habit_date
   ON completions(habit_id, date);
 """
 
+_PAUSES_DDL = """
+CREATE TABLE IF NOT EXISTS pauses(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  habit_id INTEGER NOT NULL REFERENCES habits(id) ON DELETE CASCADE,
+  start_date TEXT NOT NULL,
+  end_date TEXT NOT NULL,
+  reason TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_pauses_habit_range
+  ON pauses(habit_id, start_date, end_date);
+"""
+
+_ACHIEVEMENTS_DDL = """
+CREATE TABLE IF NOT EXISTS achievements(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  code TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  unlocked_at TEXT
+);
+"""
+
 
 def _connect(path: str) -> sqlite3.Connection:
     if path != ":memory:":
@@ -61,6 +82,8 @@ def migrate(conn: sqlite3.Connection) -> None:
     conn.execute(_FOLDERS_DDL)
     conn.execute(_HABITS_DDL)
     conn.executescript(_COMPLETIONS_DDL)
+    conn.executescript(_PAUSES_DDL)
+    conn.execute(_ACHIEVEMENTS_DDL)
     conn.commit()
 
 
