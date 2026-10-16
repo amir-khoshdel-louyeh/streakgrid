@@ -1,16 +1,19 @@
-"""StreakGrid Linux entry point (S01: bare window)."""
+"""StreakGrid Linux entry point (S07: MainWindow shell)."""
 
 import sys
+from pathlib import Path
 
-from PySide6.QtWidgets import QApplication, QMainWindow
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from PySide6.QtWidgets import QApplication
+
+from ui.main_window import MainWindow
 
 
 def main() -> int:
     app = QApplication(sys.argv)
     app.setApplicationName("StreakGrid")
-    window = QMainWindow()
-    window.setWindowTitle("StreakGrid")
-    window.resize(900, 600)
+    window = MainWindow()
     window.show()
     return app.exec()
 
