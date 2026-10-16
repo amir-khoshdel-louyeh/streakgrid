@@ -1,4 +1,4 @@
-"""SQLite store — S03: full SPEC §1 schema (5 tables)."""
+"""SQLite store — S08-1: habit create/list helpers (SPEC §1)."""
 
 from __future__ import annotations
 
@@ -91,3 +91,48 @@ def init_db(path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
     conn = _connect(path)
     migrate(conn)
     return conn
+
+
+def create_habit(
+    conn: sqlite3.Connection,
+    *,
+    name: str,
+    habit_type: str = "yes_no",
+    target_count: int = 1,
+    schedule_type: str = "daily",
+    schedule_json: str = "{}",
+    start_date: str,
+    folder_id: int | None = None,
+) -> int:
+    """Insert habit, return row id. Minimal validation for S08 dialog."""
+    from datetime import datetime, timezone
+
+    name = (name or "").strip()
+    if not name:
+        raise ValueError("habit name is required")
+    if habit_type not in ("yes_no", "counter", "dont_do"):
+        raise ValueError(f"bad type: {habit_type!r}")
+    if schedule_type not in (
+        "daily",
+        "weekly_days",
+        "interval",
+        "times_per_week",
+        "times_per_month",
+    ):
+        raise ValueError(f"bad schedule: {schedule_type!r}")
+    now = datetime.now(timezone.utc).isoformat()
+    cur = conn.execute(
+        """INSERT INTO habits(name, folder_id, type, target_count, schedule_type,
+                              schedule_json, start_date, created_at, archived)
+           VALUES(?,?,?,?,?,?,?,?,0)""",
+        (name, folder_id, habit_type, int(target_count or 1),
+         schedule_type, schedule_json, start_date, now),
+    )
+    conn.commit()
+    return int(cur.lastrowid)
+
+
+def list_habits(conn: sqlite3.Connection, *, include_archived: bool = False) -> list[sqlite3.Row]:
+    if include_archived:
+        return list(conn.execute("SELECT * FROM habits ORDER BY id"))
+    return list(conn.execute("SELECT * FROM habits WHERE archived=0 ORDER BY id"))
