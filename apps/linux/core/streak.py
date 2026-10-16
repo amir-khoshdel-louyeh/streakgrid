@@ -1,4 +1,4 @@
-"""Streaks — S05-2: current_streak walk (SPEC §3). Pure logic, no Qt."""
+"""Streaks — S05-3: best + rate (SPEC §3). Pure logic, no Qt."""
 
 from __future__ import annotations
 
@@ -95,3 +95,62 @@ def current_streak(
             break
         d -= timedelta(days=1)
     return streak
+
+
+def best_streak(
+    habit: Mapping[str, Any],
+    completions: Mapping[str, int],
+    pauses: Sequence[Any] | None = None,
+    today: DateLike | None = None,
+) -> int:
+    """Max run over full history (SPEC §3)."""
+    from .schedule import is_due
+
+    pauses = pauses or []
+    end = _to_date(today) if today is not None else date.today()
+    start_raw = _habit_get(habit, "start_date")
+    start = _to_date(start_raw) if start_raw else end - timedelta(days=365 * 3)
+    if int(_habit_get(habit, "archived", 0) or 0) == 1:
+        return 0
+
+    best = run = 0
+    d = start
+    while d <= end:
+        if not is_due(habit, d) or is_paused(pauses, d):
+            d += timedelta(days=1)
+            continue
+        iso = d.isoformat()
+        if is_done(habit, completions.get(iso), iso in completions):
+            run += 1
+            best = max(best, run)
+        else:
+            run = 0
+        d += timedelta(days=1)
+    return best
+
+
+def completion_rate(
+    habit: Mapping[str, Any],
+    completions: Mapping[str, int],
+    pauses: Sequence[Any] | None = None,
+    today: DateLike | None = None,
+    days: int = 30,
+) -> float:
+    """done_due / total_due over rolling window, paused excluded (SPEC §3)."""
+    from .schedule import is_due
+
+    pauses = pauses or []
+    end = _to_date(today) if today is not None else date.today()
+    start = end - timedelta(days=days - 1)
+    habit_start_raw = _habit_get(habit, "start_date")
+    habit_start = _to_date(habit_start_raw) if habit_start_raw else start
+    done = total = 0
+    d = max(start, habit_start)
+    while d <= end:
+        if is_due(habit, d) and not is_paused(pauses, d):
+            total += 1
+            iso = d.isoformat()
+            if is_done(habit, completions.get(iso), iso in completions):
+                done += 1
+        d += timedelta(days=1)
+    return (done / total) if total else 0.0
