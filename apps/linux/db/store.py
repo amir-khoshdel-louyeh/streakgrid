@@ -1,4 +1,4 @@
-"""SQLite store — S08-1: habit create/list helpers (SPEC §1)."""
+"""SQLite store — S09-1: completion upsert helpers."""
 
 from __future__ import annotations
 
@@ -136,3 +136,31 @@ def list_habits(conn: sqlite3.Connection, *, include_archived: bool = False) -> 
     if include_archived:
         return list(conn.execute("SELECT * FROM habits ORDER BY id"))
     return list(conn.execute("SELECT * FROM habits WHERE archived=0 ORDER BY id"))
+
+
+def get_completions(conn: sqlite3.Connection, habit_id: int) -> dict[str, int]:
+    rows = conn.execute(
+        "SELECT date, value FROM completions WHERE habit_id=?", (habit_id,)
+    ).fetchall()
+    return {r["date"]: int(r["value"]) for r in rows}
+
+
+def log_completion(
+    conn: sqlite3.Connection,
+    habit_id: int,
+    on_date: str,
+    value: int = 1,
+    note: str = "",
+) -> None:
+    """Upsert today's completion (one-tap check-off for S09)."""
+    from datetime import datetime, timezone
+
+    now = datetime.now(timezone.utc).isoformat()
+    conn.execute(
+        """INSERT INTO completions(habit_id, date, value, note, updated_at)
+           VALUES(?,?,?,?,?)
+           ON CONFLICT(habit_id, date) DO UPDATE SET value=excluded.value,
+             note=excluded.note, updated_at=excluded.updated_at""",
+        (habit_id, on_date, int(value), note, now),
+    )
+    conn.commit()
