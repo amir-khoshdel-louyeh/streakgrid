@@ -1,4 +1,4 @@
-"""SQLite store — S12-1: folder helpers."""
+"""SQLite store — S13-1: pause helpers."""
 
 from __future__ import annotations
 
@@ -201,3 +201,24 @@ def list_folders(conn: sqlite3.Connection) -> list[sqlite3.Row]:
 def set_habit_folder(conn: sqlite3.Connection, habit_id: int, folder_id: int | None) -> None:
     conn.execute("UPDATE habits SET folder_id=? WHERE id=?", (folder_id, habit_id))
     conn.commit()
+
+
+def add_pause(
+    conn: sqlite3.Connection, habit_id: int, start_date: str, end_date: str, reason: str = ""
+) -> int:
+    if start_date > end_date:
+        raise ValueError("pause start must be <= end")
+    cur = conn.execute(
+        "INSERT INTO pauses(habit_id, start_date, end_date, reason) VALUES(?,?,?,?)",
+        (habit_id, start_date, end_date, reason),
+    )
+    conn.commit()
+    return int(cur.lastrowid)
+
+
+def list_pauses(conn: sqlite3.Connection, habit_id: int) -> list[sqlite3.Row]:
+    return list(
+        conn.execute(
+            "SELECT * FROM pauses WHERE habit_id=? ORDER BY start_date", (habit_id,)
+        )
+    )
