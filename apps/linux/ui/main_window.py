@@ -146,3 +146,4 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "Invalid habit", str(exc))
                 return
             self.refresh_today()
+            self.refresh_grid()
