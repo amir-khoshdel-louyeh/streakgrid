@@ -1,4 +1,4 @@
-"""SQLite store — S11-1: retro edit helpers (value/note/clear)."""
+"""SQLite store — S12-1: folder helpers."""
 
 from __future__ import annotations
 
@@ -178,4 +178,26 @@ def clear_completion(conn: sqlite3.Connection, habit_id: int, on_date: str) -> N
     conn.execute(
         "DELETE FROM completions WHERE habit_id=? AND date=?", (habit_id, on_date)
     )
+    conn.commit()
+
+
+def create_folder(conn: sqlite3.Connection, name: str, color: str = "#888888") -> int:
+    name = (name or "").strip()
+    if not name:
+        raise ValueError("folder name is required")
+    order = conn.execute("SELECT COALESCE(MAX(sort_order), -1)+1 FROM folders").fetchone()[0]
+    cur = conn.execute(
+        "INSERT INTO folders(name, color, sort_order) VALUES(?,?,?)",
+        (name, color, int(order)),
+    )
+    conn.commit()
+    return int(cur.lastrowid)
+
+
+def list_folders(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    return list(conn.execute("SELECT * FROM folders ORDER BY sort_order, id"))
+
+
+def set_habit_folder(conn: sqlite3.Connection, habit_id: int, folder_id: int | None) -> None:
+    conn.execute("UPDATE habits SET folder_id=? WHERE id=?", (folder_id, habit_id))
     conn.commit()
