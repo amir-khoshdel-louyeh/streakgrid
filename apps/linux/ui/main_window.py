@@ -1,4 +1,4 @@
-"""Main window — S09-3: Today cards with one-tap check-off."""
+"""Main window — S10-2: Grid shows sample habit heatmap."""
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from core.heatmap import build_matrix
 from core.schedule import is_due
 from core.streak import current_streak, is_done
 from db.store import (
@@ -26,6 +27,7 @@ from db.store import (
 )
 from ui.add_dialog import AddHabitDialog
 from ui.cards import HabitCard
+from ui.heatmap_widget import HeatmapWidget
 
 
 def _placeholder(text: str) -> QWidget:
@@ -60,9 +62,17 @@ class MainWindow(QMainWindow):
         self.today_cards: list[HabitCard] = []
         self.tabs.addTab(self.today_page, "Today")
         self.tabs.addTab(_placeholder("List — coming in S14."), "List")
-        self.tabs.addTab(_placeholder("Grid — coming in S10."), "Grid")
+        self.grid_page = QWidget()
+        grid_layout = QVBoxLayout(self.grid_page)
+        self.grid_label = QLabel("Grid — no habits yet.")
+        self.grid_heatmap = HeatmapWidget()
+        grid_layout.addWidget(self.grid_label)
+        grid_layout.addWidget(self.grid_heatmap)
+        grid_layout.addStretch(1)
+        self.tabs.addTab(self.grid_page, "Grid")
         self.tabs.addTab(_placeholder("Stats — coming in S15."), "Stats")
         self.refresh_today()
+        self.refresh_grid()
 
     def _clear_cards(self) -> None:
         for card in self.today_cards:
@@ -109,6 +119,23 @@ class MainWindow(QMainWindow):
             new_value = 1  # yes_no check-off; dont_do slip (MVP)
         log_completion(self.conn, habit_id, today_iso, new_value)
         self.refresh_today()
+        self.refresh_grid()
+
+    def refresh_grid(self, today: str | None = None) -> None:
+        """S10 DoD: render 1 sample habit's 365-day heatmap."""
+        today_iso = today or date.today().isoformat()
+        habits = list_habits(self.conn)
+        if not habits:
+            self.grid_label.setText("Grid — no habits yet.")
+            self.grid_heatmap.set_matrix([[0] * 7 for _ in range(53)])
+            return
+        first = dict(habits[0])
+        completions = get_completions(self.conn, int(first["id"]))
+        target = int(first.get("target_count", 1) or 1)
+        self.grid_label.setText(f"Grid — {first.get('name')}")
+        self.grid_heatmap.set_matrix(
+            build_matrix(completions, end_date=today_iso, days=365, target=target)
+        )
 
     def _on_add(self) -> None:
         dlg = AddHabitDialog(self)
