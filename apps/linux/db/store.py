@@ -1,4 +1,4 @@
-"""SQLite store — S09-1: completion upsert helpers."""
+"""SQLite store — S11-1: retro edit helpers (value/note/clear)."""
 
 from __future__ import annotations
 
@@ -162,5 +162,20 @@ def log_completion(
            ON CONFLICT(habit_id, date) DO UPDATE SET value=excluded.value,
              note=excluded.note, updated_at=excluded.updated_at""",
         (habit_id, on_date, int(value), note, now),
+    )
+    conn.commit()
+
+
+def get_completion(conn: sqlite3.Connection, habit_id: int, on_date: str) -> sqlite3.Row | None:
+    """Single day row for retroactive editing (S11)."""
+    return conn.execute(
+        "SELECT * FROM completions WHERE habit_id=? AND date=?", (habit_id, on_date)
+    ).fetchone()
+
+
+def clear_completion(conn: sqlite3.Connection, habit_id: int, on_date: str) -> None:
+    """Delete one day (untick in detail dialog)."""
+    conn.execute(
+        "DELETE FROM completions WHERE habit_id=? AND date=?", (habit_id, on_date)
     )
     conn.commit()
