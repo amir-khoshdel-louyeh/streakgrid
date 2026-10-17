@@ -27,6 +27,7 @@ from db.store import (
 )
 from ui.add_dialog import AddHabitDialog
 from ui.cards import HabitCard
+from ui.detail_dialog import DetailDialog
 from ui.heatmap_widget import HeatmapWidget
 
 
@@ -98,6 +99,7 @@ class MainWindow(QMainWindow):
                 int(h["id"]),
                 str(h["name"]),
                 on_tap=self._on_tap,
+                on_open=self._on_open_detail,
                 counter_text=counter_text,
                 streak_active=streak > 0,
                 done=done,
@@ -118,6 +120,12 @@ class MainWindow(QMainWindow):
         else:
             new_value = 1  # yes_no check-off; dont_do slip (MVP)
         log_completion(self.conn, habit_id, today_iso, new_value)
+        self.refresh_today()
+        self.refresh_grid()
+
+    def _on_open_detail(self, habit_id: int) -> None:
+        dlg = DetailDialog(self.conn, habit_id, self)
+        dlg.exec()
         self.refresh_today()
         self.refresh_grid()
 
