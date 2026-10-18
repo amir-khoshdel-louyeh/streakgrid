@@ -26,6 +26,7 @@ from db.store import (
     init_db,
     list_folders,
     list_habits,
+    list_pauses,
     log_completion,
 )
 from ui.add_dialog import AddHabitDialog
@@ -114,12 +115,13 @@ class MainWindow(QMainWindow):
         for h in habits:
             hd = dict(h)
             completions = get_completions(self.conn, int(h["id"]))
+            pauses = [(p["start_date"], p["end_date"]) for p in list_pauses(self.conn, int(h["id"]))]
             has_row = today_iso in completions
             done = is_done(hd, completions.get(today_iso), has_row)
             counter_text = ""
             if hd.get("type") == "counter":
                 counter_text = f"{int(completions.get(today_iso, 0))}/{int(hd.get('target_count', 1))}"
-            streak = current_streak(hd, completions, [], today_iso)
+            streak = current_streak(hd, completions, pauses, today_iso)
             folder_tag = ""
             if hd.get("folder_id") in folders:
                 folder_tag = str(folders[int(hd["folder_id"])]["name"])
