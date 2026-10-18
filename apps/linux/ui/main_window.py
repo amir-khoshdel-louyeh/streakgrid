@@ -34,6 +34,7 @@ from ui.cards import HabitCard
 from ui.detail_dialog import DetailDialog
 from ui.heatmap_widget import HeatmapWidget
 from ui.list_view import ListView
+from ui.stats_view import StatsView
 
 
 def _placeholder(text: str) -> QWidget:
@@ -84,7 +85,8 @@ class MainWindow(QMainWindow):
         grid_layout.addWidget(self.export_button)
         grid_layout.addStretch(1)
         self.tabs.addTab(self.grid_page, "Grid")
-        self.tabs.addTab(_placeholder("Stats — coming in S15."), "Stats")
+        self.stats_view = StatsView(self.conn)
+        self.tabs.addTab(self.stats_view, "Stats")
         self._folder_ids: list[int | None] = [None]
         self.refresh_folders()
         self.refresh_all()
@@ -94,8 +96,8 @@ class MainWindow(QMainWindow):
         self.refresh_grid()
         if hasattr(self, "list_view"):
             self.list_view.refresh()
-        if hasattr(self, "stats_label"):
-            self.refresh_stats()
+        if hasattr(self, "stats_view"):
+            self.stats_view.refresh()
 
     def refresh_folders(self) -> None:
         current = self.folder_filter.currentData() if hasattr(self, "folder_filter") else None
