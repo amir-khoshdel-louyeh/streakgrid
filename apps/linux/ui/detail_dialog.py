@@ -1,4 +1,4 @@
-"""Detail dialog — S11-2: calendar + note + tick/untick (retroactive edit)."""
+"""Detail dialog — S13-2: retro edit + pause range."""
 
 from __future__ import annotations
 
@@ -11,12 +11,14 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QPushButton,
     QSpinBox,
     QVBoxLayout,
 )
 
-from db.store import clear_completion, get_completion, log_completion
+from db.store import add_pause, clear_completion, get_completion, list_pauses, log_completion
+from ui.pause_dialog import PauseDialog
 
 
 class DetailDialog(QDialog):
@@ -55,13 +57,19 @@ class DetailDialog(QDialog):
         self.save_button.clicked.connect(self.save_day)
         self.clear_button = QPushButton("Clear day")
         self.clear_button.clicked.connect(self.clear_day)
+        self.pause_button = QPushButton("Pause…")
+        self.pause_button.clicked.connect(self.pause_range)
         close_button = QPushButton("Close")
         close_button.clicked.connect(self.accept)
         btns.addWidget(self.save_button)
         btns.addWidget(self.clear_button)
+        btns.addWidget(self.pause_button)
         btns.addWidget(close_button)
         layout.addLayout(btns)
+        self.pause_info = QLabel("")
+        layout.addWidget(self.pause_info)
         self._load_day()
+        self._load_pauses()
 
     def selected_iso(self) -> str:
         return self.calendar.selectedDate().toString("yyyy-MM-dd")
@@ -88,3 +96,22 @@ class DetailDialog(QDialog):
     def clear_day(self) -> None:
         clear_completion(self.conn, self.habit_id, self.selected_iso())
         self._load_day()
+
+    def _load_pauses(self) -> None:
+        pauses = list_pauses(self.conn, self.habit_id)
+        if not pauses:
+            self.pause_info.setText("No pauses.")
+            return
+        pretty = ", ".join(f"{p['start_date']}→{p['end_date']}" for p in pauses[-3:])
+        self.pause_info.setText(f"Pauses: {pretty}")
+
+    def pause_range(self) -> None:
+        dlg = PauseDialog(self)
+        if dlg.exec():
+            try:
+                vals = dlg.values()
+                add_pause(self.conn, self.habit_id, **vals)
+            except ValueError as exc:
+                QMessageBox.warning(self, "Invalid pause", str(exc))
+                return
+            self._load_pauses()
