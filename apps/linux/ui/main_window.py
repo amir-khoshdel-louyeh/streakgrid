@@ -33,6 +33,7 @@ from ui.add_dialog import AddHabitDialog
 from ui.cards import HabitCard
 from ui.detail_dialog import DetailDialog
 from ui.heatmap_widget import HeatmapWidget
+from ui.list_view import ListView
 
 
 def _placeholder(text: str) -> QWidget:
@@ -69,7 +70,8 @@ class MainWindow(QMainWindow):
         today_layout.addWidget(self.add_button)
         self.today_cards: list[HabitCard] = []
         self.tabs.addTab(self.today_page, "Today")
-        self.tabs.addTab(_placeholder("List — coming in S14."), "List")
+        self.list_view = ListView(self.conn)
+        self.tabs.addTab(self.list_view, "List")
         self.grid_page = QWidget()
         grid_layout = QVBoxLayout(self.grid_page)
         self.grid_label = QLabel("Grid — no habits yet.")
@@ -81,8 +83,15 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(_placeholder("Stats — coming in S15."), "Stats")
         self._folder_ids: list[int | None] = [None]
         self.refresh_folders()
+        self.refresh_all()
+
+    def refresh_all(self) -> None:
         self.refresh_today()
         self.refresh_grid()
+        if hasattr(self, "list_view"):
+            self.list_view.refresh()
+        if hasattr(self, "stats_label"):
+            self.refresh_stats()
 
     def refresh_folders(self) -> None:
         current = self.folder_filter.currentData() if hasattr(self, "folder_filter") else None
@@ -151,14 +160,12 @@ class MainWindow(QMainWindow):
         else:
             new_value = 1  # yes_no check-off; dont_do slip (MVP)
         log_completion(self.conn, habit_id, today_iso, new_value)
-        self.refresh_today()
-        self.refresh_grid()
+        self.refresh_all()
 
     def _on_open_detail(self, habit_id: int) -> None:
         dlg = DetailDialog(self.conn, habit_id, self)
         dlg.exec()
-        self.refresh_today()
-        self.refresh_grid()
+        self.refresh_all()
 
     def refresh_grid(self, today: str | None = None) -> None:
         """S10 DoD: render 1 sample habit's 365-day heatmap."""
@@ -185,5 +192,4 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "Invalid habit", str(exc))
                 return
             self.refresh_folders()
-            self.refresh_today()
-            self.refresh_grid()
+            self.refresh_all()
