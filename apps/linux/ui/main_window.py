@@ -74,10 +74,14 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.list_view, "List")
         self.grid_page = QWidget()
         grid_layout = QVBoxLayout(self.grid_page)
-        self.grid_label = QLabel("Grid — no habits yet.")
-        self.grid_heatmap = HeatmapWidget()
-        grid_layout.addWidget(self.grid_label)
+        self.grid_selector = QComboBox()
+        self.grid_selector.currentIndexChanged.connect(lambda _i: self.refresh_grid())
+        self.grid_heatmap = HeatmapWidget(cell=14, gap=3)
+        self.export_button = QPushButton("Export PNG")
+        self.export_button.clicked.connect(self._on_export_grid)
+        grid_layout.addWidget(self.grid_selector)
         grid_layout.addWidget(self.grid_heatmap)
+        grid_layout.addWidget(self.export_button)
         grid_layout.addStretch(1)
         self.tabs.addTab(self.grid_page, "Grid")
         self.tabs.addTab(_placeholder("Stats — coming in S15."), "Stats")
@@ -168,20 +172,46 @@ class MainWindow(QMainWindow):
         self.refresh_all()
 
     def refresh_grid(self, today: str | None = None) -> None:
-        """S10 DoD: render 1 sample habit's 365-day heatmap."""
+        """S14: full 365-day grid for selected habit."""
+        from pathlib import Path
+
         today_iso = today or date.today().isoformat()
         habits = list_habits(self.conn)
+        current_id = self.grid_selector.currentData()
+        self.grid_selector.blockSignals(True)
+        self.grid_selector.clear()
+        for h in habits:
+            self.grid_selector.addItem(str(h["name"]), int(h["id"]))
+        if habits and current_id in [int(h["id"]) for h in habits]:
+            idx = [int(h["id"]) for h in habits].index(int(current_id))
+            self.grid_selector.setCurrentIndex(idx)
+        self.grid_selector.blockSignals(False)
         if not habits:
-            self.grid_label.setText("Grid — no habits yet.")
             self.grid_heatmap.set_matrix([[0] * 7 for _ in range(53)])
             return
-        first = dict(habits[0])
-        completions = get_completions(self.conn, int(first["id"]))
-        target = int(first.get("target_count", 1) or 1)
-        self.grid_label.setText(f"Grid — {first.get('name')}")
+        sel = int(self.grid_selector.currentData() or habits[0]["id"])
+        row = self.conn.execute("SELECT * FROM habits WHERE id=?", (sel,)).fetchone()
+        hd = dict(row)
+        completions = get_completions(self.conn, sel)
+        target = int(hd.get("target_count", 1) or 1)
         self.grid_heatmap.set_matrix(
             build_matrix(completions, end_date=today_iso, days=365, target=target)
         )
+
+    def export_grid_png(self, out_dir: str | None = None) -> str:
+        """Export current grid widget to ~/Pictures/streakgrid-YYYY-MM-DD.png (S14 DoD)."""
+        from pathlib import Path
+
+        today_iso = date.today().isoformat()
+        base = Path(out_dir) if out_dir else Path.home() / "Pictures"
+        base.mkdir(parents=True, exist_ok=True)
+        path = str(base / f"streakgrid-{today_iso}.png")
+        self.grid_heatmap.grab().save(path)
+        return path
+
+    def _on_export_grid(self) -> None:
+        path = self.export_grid_png()
+        QMessageBox.information(self, "Exported", f"Saved {path}")
 
     def _on_add(self) -> None:
         dlg = AddHabitDialog(self)
