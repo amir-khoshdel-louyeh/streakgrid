@@ -16,9 +16,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from core.achievements import ACHIEVEMENTS, check_unlocks, unlock
 from core.heatmap import build_matrix
 from core.schedule import is_due
-from core.streak import current_streak, is_done
+from core.streak import current_streak, is_done, is_paused
 from db.store import (
     create_folder,
     create_habit,
@@ -29,6 +30,7 @@ from db.store import (
     list_pauses,
     log_completion,
 )
+from ui.achievements_dialog import AchievementsDialog
 from ui.add_dialog import AddHabitDialog
 from ui.cards import HabitCard
 from ui.detail_dialog import DetailDialog
@@ -68,7 +70,10 @@ class MainWindow(QMainWindow):
         today_layout.addWidget(self.empty_label)
         self.add_button = QPushButton("Add habit")
         self.add_button.clicked.connect(self._on_add)
+        self.achv_button = QPushButton("🏆 Achievements")
+        self.achv_button.clicked.connect(self._on_show_achievements)
         today_layout.addWidget(self.add_button)
+        today_layout.addWidget(self.achv_button)
         self.today_cards: list[HabitCard] = []
         self.tabs.addTab(self.today_page, "Today")
         self.list_view = ListView(self.conn)
@@ -167,11 +172,13 @@ class MainWindow(QMainWindow):
             new_value = 1  # yes_no check-off; dont_do slip (MVP)
         log_completion(self.conn, habit_id, today_iso, new_value)
         self.refresh_all()
+        self.check_achievements(show_banner=True)
 
     def _on_open_detail(self, habit_id: int) -> None:
         dlg = DetailDialog(self.conn, habit_id, self)
         dlg.exec()
         self.refresh_all()
+        self.check_achievements(show_banner=True)
 
     def refresh_grid(self, today: str | None = None) -> None:
         """S14: full 365-day grid for selected habit."""
@@ -225,3 +232,63 @@ class MainWindow(QMainWindow):
                 return
             self.refresh_folders()
             self.refresh_all()
+            self.check_achievements(show_banner=False)
+
+    def _achievement_inputs(self, today_iso: str) -> dict:
+        from datetime import timedelta
+
+        end = date.fromisoformat(today_iso)
+        habits = [dict(h) for h in list_habits(self.conn)]
+        total = int(self.conn.execute("SELECT COUNT(*) FROM completions").fetchone()[0])
+        best_cur = 0
+        done7_ids: set[int] = set()
+        for h in habits:
+            comp = get_completions(self.conn, int(h["id"]))
+            pauses = [(p["start_date"], p["end_date"]) for p in list_pauses(self.conn, int(h["id"]))]
+            best_cur = max(best_cur, current_streak(dict(h), comp, pauses, today_iso))
+            for i in range(7):
+                d = (end - timedelta(days=i)).isoformat()
+                due = is_due(dict(h), d) and not is_paused(pauses, d)
+                if due and is_done(dict(h), comp.get(d), d in comp):
+                    done7_ids.add(int(h["id"]))
+                    break
+        perfect = False
+        for i in range(30):
+            d = (end - timedelta(days=i)).isoformat()
+            due = [
+                h for h in habits
+                if is_due(h, d) and not is_paused(
+                    [(p["start_date"], p["end_date"]) for p in list_pauses(self.conn, int(h["id"]))], d
+                )
+            ]
+            if due:
+                ok = True
+                for h in due:
+                    comp = get_completions(self.conn, int(h["id"]))
+                    if not is_done(h, comp.get(d), d in comp):
+                        ok = False
+                        break
+                if ok:
+                    perfect = True
+                    break
+        return {
+            "total_completions": total,
+            "best_current_streak": best_cur,
+            "habits_done_last_7d": len(done7_ids),
+            "has_perfect_day": perfect,
+        }
+
+    def check_achievements(self, show_banner: bool = True) -> list[str]:
+        """Unlock newly earned achievements, persist + banner (S16 DoD)."""
+        inputs = self._achievement_inputs(date.today().isoformat())
+        fresh = []
+        for code in check_unlocks(**inputs):
+            if unlock(self.conn, code):
+                fresh.append(code)
+        if fresh and show_banner:
+            names = ", ".join(ACHIEVEMENTS[c] for c in fresh)
+            QMessageBox.information(self, "Achievement unlocked!", f"🏅 {names}")
+        return fresh
+
+    def _on_show_achievements(self) -> None:
+        AchievementsDialog(self.conn, self).exec()
