@@ -33,6 +33,21 @@ def create_tray(
     return tray
 
 
+def add_quick_actions(tray: QSystemTrayIcon | None, on_done=None, on_snooze=None) -> None:
+    """Append Done / Snooze 15m actions to existing tray menu (S17-3)."""
+    if tray is None:
+        return
+    menu = tray.contextMenu() or QMenu()
+    menu.addSeparator()
+    if on_done is not None:
+        done_action = menu.addAction("Done (first due)")
+        done_action.triggered.connect(on_done)
+    if on_snooze is not None:
+        snooze_action = menu.addAction("Snooze 15m")
+        snooze_action.triggered.connect(on_snooze)
+    tray.setContextMenu(menu)
+
+
 def minimize_to_tray(window: QWidget, tray: QSystemTrayIcon | None, event) -> bool:
     """Hide to tray on close when tray exists. Returns True if handled."""
     if tray is not None and tray.isVisible():

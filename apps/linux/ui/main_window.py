@@ -20,7 +20,7 @@ from core.achievements import ACHIEVEMENTS, check_unlocks, unlock
 from core.heatmap import build_matrix
 from core.schedule import is_due
 from core.streak import current_streak, is_done, is_paused
-from services.tray import create_tray, minimize_to_tray
+from services.tray import add_quick_actions, create_tray, minimize_to_tray
 from db.store import (
     create_folder,
     create_habit,
@@ -97,6 +97,8 @@ class MainWindow(QMainWindow):
         self.refresh_folders()
         self.tray = create_tray(self, on_show=self._show_from_tray, on_quit=self._quit_from_tray)
         self._force_quit = False
+        self.snoozed_until = None
+        add_quick_actions(self.tray, on_done=self._on_tray_done, on_snooze=self._on_tray_snooze)
         self.refresh_all()
 
     def _show_from_tray(self) -> None:
@@ -107,6 +109,25 @@ class MainWindow(QMainWindow):
     def _quit_from_tray(self) -> None:
         self._force_quit = True
         self.close()
+
+    def _on_tray_done(self) -> None:
+        """Complete first due-undone habit today (tray quick action)."""
+        from datetime import date as _d
+
+        today_iso = _d.today().isoformat()
+        for h in list_habits(self.conn):
+            hd = dict(h)
+            if not is_due(hd, today_iso):
+                continue
+            comp = get_completions(self.conn, int(h["id"]))
+            if not is_done(hd, comp.get(today_iso), today_iso in comp):
+                self._on_tap(int(h["id"]))
+                return
+
+    def _on_tray_snooze(self) -> None:
+        from datetime import datetime, timedelta
+
+        self.snoozed_until = datetime.now() + timedelta(minutes=15)
 
     def closeEvent(self, event) -> None:  # noqa: N802
         if not self._force_quit and minimize_to_tray(self, self.tray, event):
