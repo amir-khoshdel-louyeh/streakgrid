@@ -20,6 +20,7 @@ from core.achievements import ACHIEVEMENTS, check_unlocks, unlock
 from core.heatmap import build_matrix
 from core.schedule import is_due
 from core.streak import current_streak, is_done, is_paused
+from services.tray import create_tray, minimize_to_tray
 from db.store import (
     create_folder,
     create_habit,
@@ -94,7 +95,23 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.stats_view, "Stats")
         self._folder_ids: list[int | None] = [None]
         self.refresh_folders()
+        self.tray = create_tray(self, on_show=self._show_from_tray, on_quit=self._quit_from_tray)
+        self._force_quit = False
         self.refresh_all()
+
+    def _show_from_tray(self) -> None:
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
+    def _quit_from_tray(self) -> None:
+        self._force_quit = True
+        self.close()
+
+    def closeEvent(self, event) -> None:  # noqa: N802
+        if not self._force_quit and minimize_to_tray(self, self.tray, event):
+            return
+        super().closeEvent(event)
 
     def refresh_all(self) -> None:
         self.refresh_today()
