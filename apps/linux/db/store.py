@@ -1,4 +1,4 @@
-"""SQLite store — S13-1: pause helpers."""
+"""SQLite store — S20-2: CSV export helper."""
 
 from __future__ import annotations
 
@@ -222,3 +222,21 @@ def list_pauses(conn: sqlite3.Connection, habit_id: int) -> list[sqlite3.Row]:
             "SELECT * FROM pauses WHERE habit_id=? ORDER BY start_date", (habit_id,)
         )
     )
+
+
+def export_completions_csv(conn: sqlite3.Connection, out_path: str) -> str:
+    """Export (habit, date, value, note) rows to CSV. Returns path."""
+    import csv
+
+    rows = conn.execute(
+        """SELECT h.name AS habit, c.date AS date, c.value AS value,
+                  c.note AS note, c.updated_at AS updated_at
+           FROM completions c JOIN habits h ON h.id=c.habit_id
+           ORDER BY h.name, c.date"""
+    ).fetchall()
+    with open(out_path, "w", newline="", encoding="utf-8") as fh:
+        writer = csv.writer(fh)
+        writer.writerow(["habit", "date", "value", "note", "updated_at"])
+        for r in rows:
+            writer.writerow([r["habit"], r["date"], r["value"], r["note"], r["updated_at"]])
+    return out_path
