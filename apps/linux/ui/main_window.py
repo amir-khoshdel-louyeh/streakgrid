@@ -20,6 +20,7 @@ from core.achievements import ACHIEVEMENTS, check_unlocks, unlock
 from core.heatmap import build_matrix
 from core.schedule import is_due
 from core.streak import current_streak, is_done, is_paused
+from services.nag import NagService
 from services.tray import add_quick_actions, create_tray, minimize_to_tray
 from db.store import (
     create_folder,
@@ -99,6 +100,18 @@ class MainWindow(QMainWindow):
         self._force_quit = False
         self.snoozed_until = None
         add_quick_actions(self.tray, on_done=self._on_tray_done, on_snooze=self._on_tray_snooze)
+        from datetime import datetime as _dt
+
+        from services.notify import send as _send
+
+        self.nag = NagService(
+            self.conn,
+            interval_min=15,
+            notify=lambda t, b: _send(t, b, urgency="critical"),
+            is_snoozed=lambda: self.snoozed_until is not None
+            and _dt.now() < self.snoozed_until,
+        )
+        self.nag.start()
         self.refresh_all()
 
     def _show_from_tray(self) -> None:

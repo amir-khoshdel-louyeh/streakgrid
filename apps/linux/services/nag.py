@@ -54,6 +54,11 @@ class NagService(QObject):
         self.timer.stop()
 
     def tick(self) -> list[dict]:
+        """Notify (critical) while pending; silent once all done or snoozed."""
         if self.is_snoozed():
             return []
-        return find_pending(self.conn)
+        pending = find_pending(self.conn)
+        if pending:
+            names = ", ".join(h.get("name", "?") for h in pending[:3])
+            self.notify(f"{len(pending)} habits due", names or "Time for habits!")
+        return pending
