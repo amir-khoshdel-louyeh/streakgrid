@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=StreakGrid
+GenericName=Habit Tracker
+Comment=Tactical habit tracker — GitHub-style heatmaps, 100% on-device
+Exec=python3 /opt/streakgrid/apps/linux/main.py
+Icon=streakgrid
+Terminal=false
+Categories=Utility;Productivity;
+StartupWMClass=StreakGrid
