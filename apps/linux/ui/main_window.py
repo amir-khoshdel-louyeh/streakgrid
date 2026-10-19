@@ -7,6 +7,7 @@ from datetime import date
 
 from PySide6.QtWidgets import (
     QComboBox,
+    QHBoxLayout,
     QLabel,
     QMainWindow,
     QMessageBox,
@@ -38,6 +39,7 @@ from ui.cards import HabitCard
 from ui.detail_dialog import DetailDialog
 from ui.heatmap_widget import HeatmapWidget
 from ui.list_view import ListView
+from ui.progress_ring import ProgressRing
 from ui.stats_view import StatsView
 
 
@@ -61,6 +63,12 @@ class MainWindow(QMainWindow):
 
         self.today_page = QWidget()
         today_layout = QVBoxLayout(self.today_page)
+        header = QHBoxLayout()
+        self.progress_ring = ProgressRing()
+        self.progress_label = QLabel("Today")
+        header.addWidget(self.progress_ring)
+        header.addWidget(self.progress_label, stretch=1)
+        today_layout.addLayout(header)
         self.folder_filter = QComboBox()
         self.folder_filter.currentIndexChanged.connect(lambda _i: self.refresh_today())
         today_layout.addWidget(self.folder_filter)
@@ -183,12 +191,14 @@ class MainWindow(QMainWindow):
         if wanted is not None:
             habits = [h for h in habits if h["folder_id"] == wanted]
         self.empty_label.setVisible(not habits)
+        done_count = 0
         for h in habits:
             hd = dict(h)
             completions = get_completions(self.conn, int(h["id"]))
             pauses = [(p["start_date"], p["end_date"]) for p in list_pauses(self.conn, int(h["id"]))]
             has_row = today_iso in completions
             done = is_done(hd, completions.get(today_iso), has_row)
+            done_count += 1 if done else 0
             counter_text = ""
             if hd.get("type") == "counter":
                 counter_text = f"{int(completions.get(today_iso, 0))}/{int(hd.get('target_count', 1))}"
@@ -208,6 +218,8 @@ class MainWindow(QMainWindow):
             )
             self.cards_box.addWidget(card)
             self.today_cards.append(card)
+        self.progress_ring.set_progress(done_count, len(habits))
+        self.progress_label.setText(f"Today — {done_count}/{len(habits)} done")
 
     def _on_tap(self, habit_id: int) -> None:
         today_iso = date.today().isoformat()
