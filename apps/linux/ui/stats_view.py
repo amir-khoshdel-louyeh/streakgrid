@@ -5,11 +5,11 @@ from __future__ import annotations
 import sqlite3
 from datetime import date, timedelta
 
-from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QLabel, QMessageBox, QPushButton, QVBoxLayout, QWidget
 
 from core.schedule import is_due
 from core.streak import best_streak, completion_rate, current_streak, is_done, is_paused
-from db.store import get_completions, list_habits, list_pauses
+from db.store import export_completions_csv, get_completions, list_habits, list_pauses
 
 
 class StatsView(QWidget):
@@ -21,6 +21,9 @@ class StatsView(QWidget):
         self.layout.addWidget(self.summary)
         self.extra = QLabel("")
         self.layout.addWidget(self.extra)
+        self.export_button = QPushButton("Export CSV")
+        self.export_button.clicked.connect(self._on_export)
+        self.layout.addWidget(self.export_button)
         self.rows: list[QLabel] = []
 
     def refresh(self, today: str | None = None) -> None:
@@ -86,3 +89,15 @@ class StatsView(QWidget):
         worst_i = min(range(7), key=lambda i: rates[i])
         chart = " ".join(f"{names[i]} {rates[i]:.0%}" for i in range(7))
         return f"Perfect days (30d): {perfect} | best {names[best_i]} | worst {names[worst_i]} | {chart}"
+
+    def export_csv(self, out_dir: str | None = None) -> str:
+        from pathlib import Path
+
+        base = Path(out_dir) if out_dir else Path.home() / "Documents"
+        base.mkdir(parents=True, exist_ok=True)
+        path = str(base / f"streakgrid-{date.today().isoformat()}.csv")
+        return export_completions_csv(self.conn, path)
+
+    def _on_export(self) -> None:
+        path = self.export_csv()
+        QMessageBox.information(self, "Exported", f"Saved {path}")
