@@ -41,6 +41,7 @@ from ui.heatmap_widget import HeatmapWidget
 from ui.list_view import ListView
 from ui.progress_ring import ProgressRing
 from ui.stats_view import StatsView
+from ui.theme import apply_theme, is_dark, set_dark
 
 
 def _placeholder(text: str) -> QWidget:
@@ -60,6 +61,11 @@ class MainWindow(QMainWindow):
 
         self.tabs = QTabWidget()
         self.setCentralWidget(self.tabs)
+
+        view_menu = self.menuBar().addMenu("View")
+        self.theme_action = view_menu.addAction("Toggle theme")
+        self.theme_action.setShortcut("Ctrl+T")
+        self.theme_action.triggered.connect(self._on_toggle_theme)
 
         self.today_page = QWidget()
         today_layout = QVBoxLayout(self.today_page)
@@ -145,6 +151,12 @@ class MainWindow(QMainWindow):
     def _quit_from_tray(self) -> None:
         self._force_quit = True
         self.close()
+
+    def _on_toggle_theme(self) -> None:
+        from PySide6.QtWidgets import QApplication
+
+        set_dark(not is_dark())
+        apply_theme(QApplication.instance())
 
     def _on_tray_done(self) -> None:
         """Complete first due-undone habit today (tray quick action)."""

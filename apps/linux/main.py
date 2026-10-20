@@ -9,13 +9,13 @@ from PySide6.QtWidgets import QApplication
 
 from ui.main_window import MainWindow
 from ui.onboarding import maybe_welcome
-from ui.theme import apply_dark
+from ui.theme import apply_theme
 
 
 def main() -> int:
     app = QApplication(sys.argv)
     app.setApplicationName("StreakGrid")
-    apply_dark(app)
+    apply_theme(app)
     window = MainWindow()
     window.show()
     maybe_welcome(window)
