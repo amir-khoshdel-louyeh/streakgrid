@@ -1,4 +1,4 @@
-"""SQLite store — S20-2: CSV export helper."""
+"""SQLite store — U1-1: habit update/delete/archive."""
 
 from __future__ import annotations
 
@@ -136,6 +136,36 @@ def list_habits(conn: sqlite3.Connection, *, include_archived: bool = False) -> 
     if include_archived:
         return list(conn.execute("SELECT * FROM habits ORDER BY id"))
     return list(conn.execute("SELECT * FROM habits WHERE archived=0 ORDER BY id"))
+
+
+def update_habit(conn: sqlite3.Connection, habit_id: int, **fields) -> None:
+    """Update habit columns (U1). Allowed: name, type, target_count,
+    schedule_type, schedule_json, folder_id, start_date, archived."""
+    allowed = {"name", "type", "target_count", "schedule_type",
+               "schedule_json", "folder_id", "start_date", "archived"}
+    unknown = set(fields) - allowed
+    if unknown:
+        raise ValueError(f"bad habit fields: {sorted(unknown)}")
+    if "name" in fields and not (fields["name"] or "").strip():
+        raise ValueError("habit name is required")
+    if "type" in fields and fields["type"] not in ("yes_no", "counter", "dont_do"):
+        raise ValueError(f"bad type: {fields['type']!r}")
+    if not fields:
+        return
+    cols = ", ".join(f"{k}=?" for k in fields)
+    conn.execute(f"UPDATE habits SET {cols} WHERE id=?", (*fields.values(), habit_id))
+    conn.commit()
+
+
+def delete_habit(conn: sqlite3.Connection, habit_id: int) -> None:
+    """Delete habit + its completions/pauses (FK cascade)."""
+    conn.execute("DELETE FROM habits WHERE id=?", (habit_id,))
+    conn.commit()
+
+
+def set_archived(conn: sqlite3.Connection, habit_id: int, archived: bool) -> None:
+    conn.execute("UPDATE habits SET archived=? WHERE id=?", (1 if archived else 0, habit_id))
+    conn.commit()
 
 
 def get_completions(conn: sqlite3.Connection, habit_id: int) -> dict[str, int]:
