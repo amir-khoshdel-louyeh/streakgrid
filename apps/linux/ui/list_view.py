@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QLineEdit, QVBoxLayout, QWidget
 
 from core.heatmap import build_matrix
 from core.streak import best_streak, current_streak
@@ -17,6 +17,11 @@ class ListView(QWidget):
         super().__init__(parent)
         self.conn = conn
         self.layout = QVBoxLayout(self)
+        self.search = QLineEdit()
+        self.search.setPlaceholderText("Search habits…")
+        self.search.setClearButtonEnabled(True)
+        self.search.textChanged.connect(lambda _t: self.refresh())
+        self.layout.addWidget(self.search)
         self.rows: list[QWidget] = []
 
     def refresh(self, today: str | None = None) -> None:
@@ -28,8 +33,11 @@ class ListView(QWidget):
             r.deleteLater()
         self.rows = []
         habits = list_habits(self.conn, include_archived=True)
+        query = self.search.text().strip().lower()
+        if query:
+            habits = [h for h in habits if query in str(h["name"]).lower()]
         if not habits:
-            empty = QLabel("No habits yet.")
+            empty = QLabel("No habits found." if query else "No habits yet.")
             self.layout.addWidget(empty)
             self.rows.append(empty)
             return
