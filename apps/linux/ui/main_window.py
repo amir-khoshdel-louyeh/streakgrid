@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 from core.achievements import ACHIEVEMENTS, check_unlocks, unlock
-from core.heatmap import build_matrix
+from core.heatmap import build_matrix, build_month_matrix
 from core.schedule import is_due
 from core.streak import current_streak, is_done, is_paused
 from services.nag import NagService
@@ -92,10 +92,25 @@ class MainWindow(QMainWindow):
         grid_layout = QVBoxLayout(self.grid_page)
         self.grid_selector = QComboBox()
         self.grid_selector.currentIndexChanged.connect(lambda _i: self.refresh_grid())
+        mode_row = QHBoxLayout()
+        self.grid_mode = QComboBox()
+        self.grid_mode.addItems(["Year", "Month"])
+        self.grid_mode.currentIndexChanged.connect(lambda _i: self.refresh_grid())
+        self.month_prev = QPushButton("◀")
+        self.month_prev.clicked.connect(lambda: self._shift_month(-1))
+        self.month_next = QPushButton("▶")
+        self.month_next.clicked.connect(lambda: self._shift_month(1))
+        self.month_label = QLabel("")
+        mode_row.addWidget(self.grid_mode)
+        mode_row.addWidget(self.month_prev)
+        mode_row.addWidget(self.month_label)
+        mode_row.addWidget(self.month_next)
+        mode_row.addStretch(1)
         self.grid_heatmap = HeatmapWidget(cell=14, gap=3)
         self.export_button = QPushButton("Export PNG")
         self.export_button.clicked.connect(self._on_export_grid)
         grid_layout.addWidget(self.grid_selector)
+        grid_layout.addLayout(mode_row)
         grid_layout.addWidget(self.grid_heatmap)
         grid_layout.addWidget(self.export_button)
         grid_layout.addStretch(1)
@@ -244,9 +259,7 @@ class MainWindow(QMainWindow):
         self.check_achievements(show_banner=True)
 
     def refresh_grid(self, today: str | None = None) -> None:
-        """S14: full 365-day grid for selected habit."""
-        from pathlib import Path
-
+        """S14 + parity: yearly rolling grid or monthly grid for selected habit."""
         today_iso = today or date.today().isoformat()
         habits = list_habits(self.conn)
         current_id = self.grid_selector.currentData()
@@ -258,6 +271,10 @@ class MainWindow(QMainWindow):
             idx = [int(h["id"]) for h in habits].index(int(current_id))
             self.grid_selector.setCurrentIndex(idx)
         self.grid_selector.blockSignals(False)
+        month_mode = self.grid_mode.currentText() == "Month"
+        self.month_prev.setVisible(month_mode)
+        self.month_next.setVisible(month_mode)
+        self.month_label.setVisible(month_mode)
         if not habits:
             self.grid_heatmap.set_matrix([[0] * 7 for _ in range(53)])
             return
@@ -266,9 +283,33 @@ class MainWindow(QMainWindow):
         hd = dict(row)
         completions = get_completions(self.conn, sel)
         target = int(hd.get("target_count", 1) or 1)
+        if not month_mode:
+            self.grid_heatmap.set_matrix(
+                build_matrix(completions, end_date=today_iso, days=365, target=target)
+            )
+            return
+        if not hasattr(self, "_view_year"):
+            t = date.fromisoformat(today_iso)
+            self._view_year, self._view_month = t.year, t.month
+        import calendar as _cal
+
+        self.month_label.setText(f"{_cal.month_name[self._view_month]} {self._view_year}")
         self.grid_heatmap.set_matrix(
-            build_matrix(completions, end_date=today_iso, days=365, target=target)
+            build_month_matrix(completions, self._view_year, self._view_month, target)
         )
+
+    def _shift_month(self, delta: int) -> None:
+        m = getattr(self, "_view_month", date.today().month)
+        y = getattr(self, "_view_year", date.today().year)
+        m += delta
+        while m < 1:
+            m += 12
+            y -= 1
+        while m > 12:
+            m -= 12
+            y += 1
+        self._view_year, self._view_month = y, m
+        self.refresh_grid()
 
     def export_grid_png(self, out_dir: str | None = None) -> str:
         """Export current grid widget to ~/Pictures/streakgrid-YYYY-MM-DD.png (S14 DoD)."""
