@@ -7,6 +7,8 @@ from datetime import date, timedelta
 
 from PySide6.QtWidgets import QLabel, QMessageBox, QPushButton, QVBoxLayout, QWidget
 
+from ui.week_chart import WeekChart
+
 from core.schedule import is_due
 from core.streak import best_streak, completion_rate, current_streak, is_done, is_paused
 from db.store import export_completions_csv, get_completions, list_habits, list_pauses
@@ -21,6 +23,8 @@ class StatsView(QWidget):
         self.layout.addWidget(self.summary)
         self.extra = QLabel("")
         self.layout.addWidget(self.extra)
+        self.week_chart = WeekChart()
+        self.layout.addWidget(self.week_chart)
         self.export_button = QPushButton("Export CSV")
         self.export_button.clicked.connect(self._on_export)
         self.layout.addWidget(self.export_button)
@@ -55,6 +59,29 @@ class StatsView(QWidget):
             lines.append(f"{h['name']} {r30:.2f} {best}")
         self.summary.setText(f"{len(habits)} habits tracked.")
         self.extra.setText(self._extra_text(today_iso))
+        self.week_chart.set_rates(self.weekday_rates(today_iso))
+
+    def weekday_rates(self, today_iso: str) -> list[float]:
+        """Per-weekday completion over last 12 weeks (for the bar chart)."""
+        end = date.fromisoformat(today_iso)
+        habits = [dict(h) for h in list_habits(self.conn)]
+        comp = {int(h["id"]): get_completions(self.conn, int(h["id"])) for h in habits}
+        pauses = {
+            int(h["id"]): [(p["start_date"], p["end_date"]) for p in list_pauses(self.conn, int(h["id"]))]
+            for h in habits
+        }
+        done = [0] * 7
+        total = [0] * 7
+        for i in range(84):
+            d = end - timedelta(days=i)
+            wd = d.weekday()
+            for h in habits:
+                if is_due(h, d) and not is_paused(pauses[int(h["id"])], d):
+                    total[wd] += 1
+                    iso = d.isoformat()
+                    if is_done(h, comp[int(h["id"])].get(iso), iso in comp[int(h["id"])]):
+                        done[wd] += 1
+        return [(done[i] / total[i] if total[i] else 0.0) for i in range(7)]
 
     def _extra_text(self, today_iso: str) -> str:
         """Perfect days (30d) + best/worst weekday over last 12 weeks."""
