@@ -18,8 +18,10 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from core.streak import is_done, is_paused
+from core.heatmap import build_matrix
+from core.streak import best_streak, current_streak, is_done, is_paused
 from db.store import add_pause, clear_completion, get_completion, list_pauses, log_completion
+from ui.heatmap_widget import HeatmapWidget
 from ui.pause_dialog import PauseDialog
 
 
@@ -34,6 +36,11 @@ class DetailDialog(QDialog):
 
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel(f"{self.habit.get('name','')} [{self.habit.get('type')}]"))
+
+        self.streak_label = QLabel("")
+        layout.addWidget(self.streak_label)
+        self.history_heatmap = HeatmapWidget(cell=8, gap=2)
+        layout.addWidget(self.history_heatmap)
 
         self.calendar = QCalendarWidget()
         self.calendar.setGridVisible(True)
@@ -73,6 +80,7 @@ class DetailDialog(QDialog):
         self._load_day()
         self._load_pauses()
         self._highlight_days()
+        self._refresh_history()
 
     def selected_iso(self) -> str:
         return self.calendar.selectedDate().toString("yyyy-MM-dd")
@@ -117,6 +125,24 @@ class DetailDialog(QDialog):
                     self.calendar.setDateTextFormat(d, pause_fmt)
                 d = d.addDays(1)
 
+    def _refresh_history(self) -> None:
+        """Streak line + 120-day mini heatmap, like HabitForge detail."""
+        from datetime import date as _d
+
+        from db.store import get_completions
+
+        completions = get_completions(self.conn, self.habit_id)
+        pauses = [(p["start_date"], p["end_date"]) for p in list_pauses(self.conn, self.habit_id)]
+        today = _d.today().isoformat()
+        cur = current_streak(self.habit, completions, pauses, today)
+        best = best_streak(self.habit, completions, pauses, today)
+        fire = "🔥 " if cur > 0 else ""
+        self.streak_label.setText(f"{fire}Streak {cur} — best {best}")
+        target = int(self.habit.get("target_count", 1) or 1)
+        self.history_heatmap.set_matrix(
+            build_matrix(completions, end_date=today, days=120, target=target)
+        )
+
     def save_day(self) -> None:
         log_completion(
             self.conn, self.habit_id, self.selected_iso(),
@@ -124,11 +150,13 @@ class DetailDialog(QDialog):
         )
         self._load_day()
         self._highlight_days()
+        self._refresh_history()
 
     def clear_day(self) -> None:
         clear_completion(self.conn, self.habit_id, self.selected_iso())
         self._load_day()
         self._highlight_days()
+        self._refresh_history()
 
     def _load_pauses(self) -> None:
         pauses = list_pauses(self.conn, self.habit_id)
