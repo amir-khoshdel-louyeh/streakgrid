@@ -1,7 +1,8 @@
-"""Heatmap — S06-1: 53x7 intensity matrix (SPEC §4). Pure logic, no Qt."""
+"""Heatmap — P2-1: yearly + monthly matrices (SPEC §4). Pure logic, no Qt."""
 
 from __future__ import annotations
 
+import calendar as _calendar
 from datetime import date, timedelta
 from typing import Mapping, Union
 
@@ -51,4 +52,28 @@ def build_matrix(
         col = 52 - ((end_monday - monday).days // 7)
         if 0 <= col < 53:
             grid[col][d.weekday()] = max(grid[col][d.weekday()], intensity(val, target))
+    return grid
+
+
+def build_month_matrix(
+    completions: Mapping[str, int],
+    year: int,
+    month: int,
+    target: int = 1,
+) -> list[list[int]]:
+    """Month grid: N week-cols x 7 rows (Mon=0), like HabitForge grid view."""
+    first = date(year, month, 1)
+    ndays = _calendar.monthrange(year, month)[1]
+    offset = first.weekday()
+    ncols = (offset + ndays + 6) // 7
+    grid: list[list[int]] = [[0] * 7 for _ in range(ncols)]
+    for iso, val in (completions or {}).items():
+        try:
+            d = _to_date(iso)
+        except ValueError:
+            continue
+        if d.year != year or d.month != month:
+            continue
+        col = (offset + d.day - 1) // 7
+        grid[col][d.weekday()] = max(grid[col][d.weekday()], intensity(val, target))
     return grid
