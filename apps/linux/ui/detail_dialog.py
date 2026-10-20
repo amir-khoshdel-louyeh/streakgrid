@@ -5,6 +5,7 @@ from __future__ import annotations
 import sqlite3
 
 from PySide6.QtCore import QDate
+from PySide6.QtGui import QBrush, QColor, QTextCharFormat
 from PySide6.QtWidgets import (
     QCalendarWidget,
     QDialog,
@@ -17,6 +18,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from core.streak import is_done, is_paused
 from db.store import add_pause, clear_completion, get_completion, list_pauses, log_completion
 from ui.pause_dialog import PauseDialog
 
@@ -70,6 +72,7 @@ class DetailDialog(QDialog):
         layout.addWidget(self.pause_info)
         self._load_day()
         self._load_pauses()
+        self._highlight_days()
 
     def selected_iso(self) -> str:
         return self.calendar.selectedDate().toString("yyyy-MM-dd")
@@ -86,16 +89,46 @@ class DetailDialog(QDialog):
             self.value_spin.setValue(int(row["value"]))
             self.note_edit.setText(row["note"] or "")
 
+    def _highlight_days(self) -> None:
+        """Paint done days green and paused days gray, like HabitForge detail."""
+        from db.store import get_completions
+
+        completions = get_completions(self.conn, self.habit_id)
+        pauses = [(p["start_date"], p["end_date"]) for p in list_pauses(self.conn, self.habit_id)]
+        done_fmt = QTextCharFormat()
+        done_fmt.setBackground(QBrush(QColor("#30a14e")))
+        done_fmt.setForeground(QBrush(QColor("#ffffff")))
+        pause_fmt = QTextCharFormat()
+        pause_fmt.setBackground(QBrush(QColor("#414868")))
+        pause_fmt.setForeground(QBrush(QColor("#a9b1d6")))
+        seen: set[str] = set()
+        for iso, val in completions.items():
+            if iso in seen:
+                continue
+            seen.add(iso)
+            if is_done(self.habit, val, True):
+                self.calendar.setDateTextFormat(QDate.fromString(iso, "yyyy-MM-dd"), done_fmt)
+        for p in list_pauses(self.conn, self.habit_id):
+            s = QDate.fromString(p["start_date"], "yyyy-MM-dd")
+            e = QDate.fromString(p["end_date"], "yyyy-MM-dd")
+            d = s
+            while d <= e:
+                if d.toString("yyyy-MM-dd") not in completions:
+                    self.calendar.setDateTextFormat(d, pause_fmt)
+                d = d.addDays(1)
+
     def save_day(self) -> None:
         log_completion(
             self.conn, self.habit_id, self.selected_iso(),
             int(self.value_spin.value()), self.note_edit.text(),
         )
         self._load_day()
+        self._highlight_days()
 
     def clear_day(self) -> None:
         clear_completion(self.conn, self.habit_id, self.selected_iso())
         self._load_day()
+        self._highlight_days()
 
     def _load_pauses(self) -> None:
         pauses = list_pauses(self.conn, self.habit_id)
@@ -115,3 +148,4 @@ class DetailDialog(QDialog):
                 QMessageBox.warning(self, "Invalid pause", str(exc))
                 return
             self._load_pauses()
+            self._highlight_days()
