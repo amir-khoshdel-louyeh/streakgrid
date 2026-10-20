@@ -27,7 +27,7 @@ class ListView(QWidget):
             self.layout.removeWidget(r)
             r.deleteLater()
         self.rows = []
-        habits = list_habits(self.conn)
+        habits = list_habits(self.conn, include_archived=True)
         if not habits:
             empty = QLabel("No habits yet.")
             self.layout.addWidget(empty)
@@ -42,7 +42,8 @@ class ListView(QWidget):
             row = QFrame()
             row.setFrameShape(QFrame.StyledPanel)
             box = QHBoxLayout(row)
-            name = QLabel(f"{h['name']}  🔥{cur}  best {best}")
+            archived_tag = "  [archived]" if h["archived"] else ""
+            name = QLabel(f"{h['name']}  🔥{cur}  best {best}{archived_tag}")
             mini = HeatmapWidget(cell=5, gap=2)
             mini.setFixedHeight(5 * 0 + 7 * (5 + 2) + 2)
             mini.set_matrix(
