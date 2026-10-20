@@ -20,7 +20,11 @@ from PySide6.QtWidgets import (
 
 from core.heatmap import build_matrix
 from core.streak import best_streak, current_streak, is_done, is_paused
-from db.store import add_pause, clear_completion, get_completion, list_pauses, log_completion
+from db.store import (
+    add_pause, clear_completion, delete_habit, get_completion,
+    list_pauses, log_completion, set_archived, update_habit,
+)
+from ui.add_dialog import AddHabitDialog
 from ui.heatmap_widget import HeatmapWidget
 from ui.pause_dialog import PauseDialog
 
@@ -68,19 +72,31 @@ class DetailDialog(QDialog):
         self.clear_button.clicked.connect(self.clear_day)
         self.pause_button = QPushButton("Pause…")
         self.pause_button.clicked.connect(self.pause_range)
+        self.edit_button = QPushButton("Edit…")
+        self.edit_button.clicked.connect(self.edit_habit)
+        self.archive_button = QPushButton("Archive")
+        self.archive_button.clicked.connect(self.toggle_archive)
+        self.delete_button = QPushButton("Delete")
+        self.delete_button.clicked.connect(self.delete_habit)
         close_button = QPushButton("Close")
         close_button.clicked.connect(self.accept)
         btns.addWidget(self.save_button)
         btns.addWidget(self.clear_button)
         btns.addWidget(self.pause_button)
-        btns.addWidget(close_button)
         layout.addLayout(btns)
+        meta = QHBoxLayout()
+        meta.addWidget(self.edit_button)
+        meta.addWidget(self.archive_button)
+        meta.addWidget(self.delete_button)
+        meta.addWidget(close_button)
+        layout.addLayout(meta)
         self.pause_info = QLabel("")
         layout.addWidget(self.pause_info)
         self._load_day()
         self._load_pauses()
         self._highlight_days()
         self._refresh_history()
+        self._reload_habit()
 
     def selected_iso(self) -> str:
         return self.calendar.selectedDate().toString("yyyy-MM-dd")
@@ -157,6 +173,44 @@ class DetailDialog(QDialog):
         self._load_day()
         self._highlight_days()
         self._refresh_history()
+
+    def _reload_habit(self) -> None:
+        row = self.conn.execute("SELECT * FROM habits WHERE id=?", (self.habit_id,)).fetchone()
+        self.habit = dict(row) if row else {}
+        self.setWindowTitle(f"Habit — {self.habit.get('name', self.habit_id)}")
+        archived = bool(self.habit.get("archived", 0))
+        self.archive_button.setText("Unarchive" if archived else "Archive")
+
+    def edit_habit(self) -> None:
+        dlg = AddHabitDialog(self)
+        dlg.set_values(self.habit)
+        if dlg.exec():
+            try:
+                vals = dlg.values()
+            except ValueError as exc:
+                QMessageBox.warning(self, "Invalid habit", str(exc))
+                return
+            update_habit(
+                self.conn, self.habit_id,
+                name=vals["name"], type=vals["habit_type"],
+                target_count=vals["target_count"],
+                schedule_type=vals["schedule_type"],
+                schedule_json=vals["schedule_json"],
+            )
+            self._reload_habit()
+            self._highlight_days()
+            self._refresh_history()
+
+    def toggle_archive(self) -> None:
+        set_archived(self.conn, self.habit_id, not self.habit.get("archived", 0))
+        self.accept()
+
+    def delete_habit(self) -> None:
+        if QMessageBox.question(self, "Delete habit",
+                               f"Delete '{self.habit.get('name')}' and all its history?") != QMessageBox.Yes:
+            return
+        delete_habit(self.conn, self.habit_id)
+        self.accept()
 
     def _load_pauses(self) -> None:
         pauses = list_pauses(self.conn, self.habit_id)
