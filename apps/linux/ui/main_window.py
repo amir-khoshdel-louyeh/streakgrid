@@ -219,8 +219,10 @@ class MainWindow(QMainWindow):
                 counter_text = f"{int(completions.get(today_iso, 0))}/{int(hd.get('target_count', 1))}"
             streak = current_streak(hd, completions, pauses, today_iso)
             folder_tag = ""
+            folder_color = ""
             if hd.get("folder_id") in folders:
                 folder_tag = str(folders[int(hd["folder_id"])]["name"])
+                folder_color = str(folders[int(hd["folder_id"])].get("color", ""))
             card = HabitCard(
                 int(h["id"]),
                 str(h["name"]),
@@ -231,6 +233,7 @@ class MainWindow(QMainWindow):
                 streak_active=streak > 0,
                 done=done,
                 folder_tag=folder_tag,
+                folder_color=folder_color,
                 stepper=hd.get("type") == "counter",
             )
             self.cards_box.addWidget(card)

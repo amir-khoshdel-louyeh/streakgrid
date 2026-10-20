@@ -19,6 +19,7 @@ class HabitCard(QFrame):
         streak_active: bool = False,
         done: bool = False,
         folder_tag: str = "",
+        folder_color: str = "",
         stepper: bool = False,
         parent=None,
     ) -> None:
@@ -31,6 +32,7 @@ class HabitCard(QFrame):
         self._counter_text = counter_text
         self._streak_active = streak_active
         self._folder_tag = folder_tag
+        self._folder_color = folder_color
         self.setFrameShape(QFrame.StyledPanel)
 
         layout = QHBoxLayout(self)
@@ -54,10 +56,14 @@ class HabitCard(QFrame):
         self._render_name()
 
     def _render_name(self) -> None:
+        from PySide6.QtCore import Qt as _Qt
+
         prefix = "🔥 " if self._streak_active else ""
         suffix = f"  {self._counter_text}" if self._counter_text else ""
         folder = f" [{self._folder_tag}]" if self._folder_tag else ""
-        self.name_label.setText(f"{prefix}{self._base_name}{suffix}{folder}")
+        dot = f'<font color="{self._folder_color}">●</font> ' if self._folder_color else ""
+        self.name_label.setTextFormat(_Qt.RichText)
+        self.name_label.setText(f"{dot}{prefix}{self._base_name}{suffix}{folder}")
 
     def _handle_tap(self) -> None:
         if self._on_tap is not None:
