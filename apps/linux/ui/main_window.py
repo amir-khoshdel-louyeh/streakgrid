@@ -226,10 +226,12 @@ class MainWindow(QMainWindow):
                 str(h["name"]),
                 on_tap=self._on_tap,
                 on_open=self._on_open_detail,
+                on_decrement=self._on_decrement,
                 counter_text=counter_text,
                 streak_active=streak > 0,
                 done=done,
                 folder_tag=folder_tag,
+                stepper=hd.get("type") == "counter",
             )
             self.cards_box.addWidget(card)
             self.today_cards.append(card)
@@ -251,6 +253,14 @@ class MainWindow(QMainWindow):
         log_completion(self.conn, habit_id, today_iso, new_value)
         self.refresh_all()
         self.check_achievements(show_banner=True)
+
+    def _on_decrement(self, habit_id: int) -> None:
+        """Step a counter back down (min 0), fixing overshoots without dialog."""
+        today_iso = date.today().isoformat()
+        completions = get_completions(self.conn, habit_id)
+        new_value = max(0, int(completions.get(today_iso, 0)) - 1)
+        log_completion(self.conn, habit_id, today_iso, new_value)
+        self.refresh_all()
 
     def _on_open_detail(self, habit_id: int) -> None:
         dlg = DetailDialog(self.conn, habit_id, self)

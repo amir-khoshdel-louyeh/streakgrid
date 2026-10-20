@@ -14,16 +14,19 @@ class HabitCard(QFrame):
         name: str,
         on_tap=None,
         on_open=None,
+        on_decrement=None,
         counter_text: str = "",
         streak_active: bool = False,
         done: bool = False,
         folder_tag: str = "",
+        stepper: bool = False,
         parent=None,
     ) -> None:
         super().__init__(parent)
         self.habit_id = habit_id
         self._on_tap = on_tap
         self._on_open = on_open
+        self._on_decrement = on_decrement
         self._base_name = name
         self._counter_text = counter_text
         self._streak_active = streak_active
@@ -36,12 +39,17 @@ class HabitCard(QFrame):
         self.detail_button = QPushButton("📅")
         self.detail_button.setFixedSize(36, 36)
         self.detail_button.clicked.connect(self._handle_open)
+        layout.addWidget(self.name_label)
+        layout.addWidget(self.detail_button)
+        if stepper:
+            self.dec_button = QPushButton("−")
+            self.dec_button.setFixedSize(36, 36)
+            self.dec_button.clicked.connect(self._handle_decrement)
+            layout.addWidget(self.dec_button)
         self.tap_button = QPushButton("●" if done else "○")
         self.tap_button.setFixedSize(40, 40)
         self.tap_button.setStyleSheet("font-size: 20px; border-radius: 20px;")
         self.tap_button.clicked.connect(self._handle_tap)
-        layout.addWidget(self.name_label)
-        layout.addWidget(self.detail_button)
         layout.addWidget(self.tap_button)
         self._render_name()
 
@@ -58,6 +66,10 @@ class HabitCard(QFrame):
     def _handle_open(self) -> None:
         if self._on_open is not None:
             self._on_open(self.habit_id)
+
+    def _handle_decrement(self) -> None:
+        if self._on_decrement is not None:
+            self._on_decrement(self.habit_id)
 
     def set_done(self, done: bool) -> None:
         self.tap_button.setText("●" if done else "○")
