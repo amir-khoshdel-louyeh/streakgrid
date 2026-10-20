@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from PySide6.QtWidgets import QApplication
 
 from ui.main_window import MainWindow
+from ui.onboarding import maybe_welcome
 from ui.theme import apply_dark
 
 
@@ -17,6 +18,7 @@ def main() -> int:
     apply_dark(app)
     window = MainWindow()
     window.show()
+    maybe_welcome(window)
     return app.exec()
 
 
