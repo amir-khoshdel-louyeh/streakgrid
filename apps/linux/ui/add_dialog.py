@@ -46,6 +46,27 @@ class AddHabitDialog(QDialog):
         buttons.rejected.connect(self.reject)
         form.addRow(buttons)
 
+    def set_values(self, habit: dict) -> None:
+        """Prefill form from a habit row (for editing, U1)."""
+        self.setWindowTitle(f"Edit habit — {habit.get('name', '')}")
+        self.name_edit.setText(str(habit.get("name", "")))
+        self.type_box.setCurrentText(str(habit.get("type", "yes_no")))
+        self.target_spin.setValue(int(habit.get("target_count", 1) or 1))
+        stype = str(habit.get("schedule_type", "daily"))
+        self.schedule_box.setCurrentText(stype)
+        try:
+            params = json.loads(habit.get("schedule_json") or "{}")
+        except (json.JSONDecodeError, TypeError):
+            params = {}
+        if stype == "weekly_days":
+            self.detail_edit.setText(",".join(str(d) for d in params.get("days", [])))
+        elif stype == "interval":
+            self.detail_edit.setText(str(params.get("every_n_days", 1)))
+        elif stype in ("times_per_week", "times_per_month"):
+            self.detail_edit.setText(str(params.get("times", 3)))
+        else:
+            self.detail_edit.setText("")
+
     def values(self) -> dict:
         """Validated dialog values -> store.create_habit kwargs."""
         name = self.name_edit.text().strip()
